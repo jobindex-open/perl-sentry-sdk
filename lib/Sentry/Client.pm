@@ -20,10 +20,15 @@ has _options => sub { {} };
 has _transport =>
   sub ($self) { Sentry::Transport::Http->new(dsn => $self->_dsn) };
 has scope        => sub { Sentry::Hub::Scope->new };
+has _integration => sub { Sentry::Integration->new };
 has integrations => sub ($self) { $self->_options->{integrations} // [] };
 
 sub setup_integrations ($self) {
-  Sentry::Integration->setup($self->integrations);
+  my @integrations = $self->_integration->setup(
+    $self->_options->{integrations} // [],
+    $self->_options->{default_integrations}
+  );
+  $self->integrations(\@integrations);
 }
 
 #  (alternatively normal constructor) This takes typically an object with options + dsn.

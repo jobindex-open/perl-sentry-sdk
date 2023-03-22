@@ -8,6 +8,8 @@ use Mojo::File;
 use lib Mojo::File->new(Cwd::realpath((caller)[1]))->sibling('lib')->to_string;
 
 use Mock::Sentry::Transport::HTTP;
+use Mock::Sentry::Integration;
+use Mock::Sentry::Integration::MockIntegration;
 use Mojo::Util 'dumper';
 use Scalar::Util 'looks_like_number';
 use Sentry::Client;
@@ -126,5 +128,38 @@ describe 'Sentry::Client' => sub {
     };
   };
 };
+
+describe 'Sentry::Client' => sub {
+  describe 'setup_integrations()' => sub {
+    it 'passes custom integrations from options' => sub {
+      my $integration = Mock::Sentry::Integration->new;
+      my $mock_integration = Mock::Sentry::Integration::MockIntegration->new;
+      my $options = {
+        integrations => [$mock_integration]
+      };
+      my $client = Sentry::Client->new(
+        _integration => $integration,
+        _options     => $options
+      );
+      $client->setup_integrations;
+      is_deeply($integration->integrations, [$mock_integration]);
+      is_deeply($client->integrations, [$mock_integration]);
+    };
+
+    it 'passes default_integrations from options' => sub {
+      my $integration = Mock::Sentry::Integration->new;
+      my $options = {
+        default_integrations => 0
+      };
+      my $client = Sentry::Client->new(
+        _integration => $integration,
+        _options     => $options
+      );
+      $client->setup_integrations;
+      is($integration->default_integrations, 0);
+    };
+  }
+};
+
 
 runtests;
