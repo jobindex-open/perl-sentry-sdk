@@ -8,6 +8,7 @@ use Sentry::DSN;
 use Sentry::Hub::Scope;
 use Sentry::Integration;
 use Sentry::Logger 'logger';
+use Sentry::Severity;
 use Sentry::SourceFileRegistry;
 use Sentry::Stacktrace;
 use Sentry::Transport::Http;
@@ -77,9 +78,13 @@ sub event_from_exception ($self, $exception, $hint = undef, $scope = undef) {
     },
   });
 
+  my $level = $hint && $hint->{level};
+  $level ||= $exception->level if $exception->can('level');
+  $level ||= Sentry::Severity->Error;
+
   return {
     event_id  => $hint && $hint->{event_id},
-    level     => ($hint && $hint->{level}) || Sentry::Severity->Error,
+    level     => $level,
     exception => {
       values => [{
         type  => ref($exception),
