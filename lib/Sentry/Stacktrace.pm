@@ -28,10 +28,14 @@ sub prepare_frames ($self) {
 # calling frame called.
 sub _shift_frame_subroutine(@frames) {
   my $caller_sub;
+  my $caller_args;
   for my $frame (@frames) {
     my $new_caller_sub = $frame->subroutine;
+    my $new_caller_args = $frame->vars;
     $frame->subroutine($caller_sub);
+    $frame->vars($caller_args);
     $caller_sub = $new_caller_sub;
+    $caller_args = $new_caller_args;
   }
 }
 

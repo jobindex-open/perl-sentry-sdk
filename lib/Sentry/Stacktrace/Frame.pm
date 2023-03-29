@@ -6,7 +6,7 @@ use Mojo::File;
 use Mojo::Home;
 use Sentry::SourceFileRegistry;
 
-has [qw(module filename line subroutine)];
+has [qw(module filename line subroutine vars)];
 has _source_file_registry => sub { Sentry::SourceFileRegistry->new };
 has _home                 => sub { Mojo::Home->new->detect };
 
@@ -33,16 +33,19 @@ sub TO_JSON ($self) {
     lineno    => $self->line,
     module    => $self->module,
     function  => $self->subroutine,
+    vars      => $self->vars,
     %{ $self->_map_file_to_context() },
   };
 }
 
-sub from_caller ($package, $module, $filename, $line, $subroutine, @args) {
+sub from_caller ($package, $module, $filename, $line, $subroutine, @rest) {
+  my $vars = ref $rest[-1] eq 'ARRAY' ? pop @rest : [];
   return $package->new({
     module     => $module,
     filename   => $filename,
     line       => $line,
-    subroutine => $subroutine
+    subroutine => $subroutine,
+    vars       => { @$vars },
   });
 }
 
