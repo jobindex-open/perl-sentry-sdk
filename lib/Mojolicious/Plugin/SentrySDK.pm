@@ -49,7 +49,7 @@ sub register ($self, $app, $conf) {
         try {
           $next->();
         } catch {
-          Sentry::SDK->capture_exception($_);
+          Sentry::SDK->capture_exception($_, { logger => 'mojo' });
           $c->reply->exception($_)
         } finally {
           my $status = $c->res->code;

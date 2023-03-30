@@ -14,6 +14,7 @@ has error_event_processors => sub { [] };
 has event_processors       => sub { [] };
 has extra                  => sub { {} };
 has fingerprint            => sub { [] };
+has logger                 => undef;
 has level                  => undef;
 has span                   => undef;
 has tags                   => sub { {} };
@@ -59,6 +60,10 @@ sub set_context ($self, $key, $context = undef) {
   # $self->_notify_scope_listeners();
 
   return $self;
+}
+
+sub set_logger ($self, $logger) {
+  $self->logger($logger);
 }
 
 sub set_level ($self, $level) {
@@ -131,6 +136,7 @@ sub apply_to_event ($self, $event, $hint = undef) {
   merge($event, $self, 'user')     if $self->user;
   merge($event, $self, 'contexts') if $self->contexts;
 
+  $event->{logger}      = $self->logger           if $self->logger;
   $event->{level}       = $self->level            if $self->level;
   $event->{transaction} = $self->transaction_name if $self->transaction_name;
 
