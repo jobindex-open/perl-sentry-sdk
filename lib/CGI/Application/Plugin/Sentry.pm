@@ -22,7 +22,7 @@ CGI::Application->add_callback(
 
 CGI::Application->add_callback(
   error => sub ($c, $error) {
-    Sentry::SDK->capture_exception($error);
+    Sentry::SDK->capture_exception($error, { logger => 'cgi' });
   }
 );
 
