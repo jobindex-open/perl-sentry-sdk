@@ -59,6 +59,24 @@ sub register ($self, $app, $conf) {
       });
     }
   );
+
+  $app->hook(
+    before_render => sub ($c, $args) {
+      return if $args->{'mojo.string'};
+      my ($pkg, $file, $line) = caller 2;
+      my %data = (
+        $args->%{qw(template format handler layout extends inline json text mojo.rendered mojo.maybe)},
+        data => $args->{data} && '[...]',
+      );
+      delete $data{$_} for grep { !$data{$_} } keys %data;
+      Sentry::SDK->add_breadcrumb({
+          category => 'mojo',
+          level => Sentry::Severity->Info,
+          message => "Rendering response in $pkg ($file:$line)",
+          data => \%data,
+        });
+    }
+  );
 }
 
 1;
