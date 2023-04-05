@@ -1,6 +1,7 @@
 package Sentry::SourceFileRegistry;
 use Mojo::Base -base, -signatures;
 
+use Encode;
 use Mojo::File;
 use Mojo::Util 'dumper';
 use Sentry::Cache;
@@ -11,6 +12,7 @@ has _cache => sub { Sentry::Cache->get_instance };
 sub _get_cached_context_line ($self, $file) {
   if (!$self->_cache->exists($file)) {
     my $content = -e $file ? Mojo::File->new($file)->slurp : undef;
+    $content = Encode::decode('UTF-8', $content, Encode::FB_DEFAULT) if $content;
 
     my $context
       = Sentry::SourceFileRegistry::ContextLine->new(content => $content);
