@@ -1,50 +1,52 @@
 package Sentry::Integration::MojoTemplate;
+
 use Mojo::Base 'Sentry::Integration::Base', -signatures;
-
-use Try::Tiny;
 use Sentry::Util 'around';
+use Try::Tiny;
 
-has tracing        => 1;
-has fix_stacktrace => 1;
+has tracing            => 1;
+has fix_stacktrace     => 1;
+has template_namespace => 'Mojo::Template::Sandbox';
 
 sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
+  if ($self->fix_stacktrace) {
+    my $namespace = $self->template_namespace;
+    $add_global_event_processor->(
+      sub ($event, $hint) {
+        return $event unless $event && exists $event->{exception}{values};
+        for my $error ($event->{exception}{values}->@*) {
+          _fix_template_stack_frames($namespace, $error->{stacktrace});
+        }
+        return $event;
+      }
+    );
+  }
+
   around(
     'Mojo::Template',
-    render => sub ($orig, $mojo_template, @args) {
+    process => sub ($orig, $mojo_template, @args) {
       my $hub         = $get_current_hub->();
       my $parent_span = $self->tracing && $hub->get_current_scope->get_span;
-      my $output;
-      $hub->with_scope(sub ($scope) {
-        my $namespace = $mojo_template->namespace;
 
-        my $span;
-        if ($parent_span) {
-          $span = $parent_span->start_child({
-            op          => 'mojo.template',
-            description => $mojo_template->name,
-            data => { compiled => $mojo_template->compiled ? 'yes' : 'no', },
-          });
-          $scope->set_span($span);
-        }
 
-        try {
-          $output = $orig->($mojo_template, @args);
-          if ( $self->fix_stacktrace
-            && ref $output
-            && $output->isa('Mojo::Exception')) {
-            _fix_template_stack_frames($namespace, $output);
-          }
-        } finally {
-          $span->finish() if $span;
-        };
-      });
+      my $span;
+      if ($parent_span) {
+        $span = $parent_span->start_child({
+          op          => 'mojo.template',
+          description => $mojo_template->name,
+          data => { compiled => $mojo_template->compiled ? 'yes' : 'no', },
+        });
+      }
+
+      my $output = $orig->($mojo_template, @args);
+      $span->finish() if $span;
       return $output;
     }
   );
 }
 
-sub _fix_template_stack_frames($namespace, $exc) {
-  for my $frame ($exc->frames->@*) {
+sub _fix_template_stack_frames($namespace, $stacktrace) {
+  for my $frame ($stacktrace->frames->@*) {
     # Frames coming from Mojo templates will have their module set to
     # $namespace which is not very useful since it will be the same for all
     # templates. Additionally, if using Mojolicious::Plugin::EPRenderer, the
@@ -52,12 +54,14 @@ sub _fix_template_stack_frames($namespace, $exc) {
     # grouping.
     # Remove module and subroutine from the frame so that Sentry falls back
     # to using the filename in the UI and for grouping.
-    if ($frame->[0] && $frame->[0] eq $namespace && $frame->[1]) {
-      $frame->[0] = '';    # module
-      $frame->[3] = '';    # subroutine
-    } elsif ($frame->[3]) {
+    if ( $frame->module
+      && $frame->module =~ /^${namespace}(::.*)?$/
+      && $frame->filename) {
+      $frame->module('');
+      $frame->subroutine('');
+    } elsif ($frame->subroutine) {
       # Remove namespace from subroutine name
-      $frame->[3] =~ s/^${namespace}:://;
+      $frame->subroutine($frame->subroutine =~ s/^${namespace}:://r);
     }
   }
 }
