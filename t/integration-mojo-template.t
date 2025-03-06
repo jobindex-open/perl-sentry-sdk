@@ -37,6 +37,7 @@ describe 'Sentry::Integration::MojoTemplate' => sub {
   after each => sub {
     restore_original 'Mojo::Template', 'process';
     splice Sentry::Hub::Scope::get_global_event_processors()->@*, 0;
+    $scope->clear_breadcrumbs;
   };
 
   it 'creates a span when rendering template' => sub {
@@ -52,6 +53,28 @@ describe 'Sentry::Integration::MojoTemplate' => sub {
     is $tmpl_span{description}, 'tmpl foo';
     is $tmpl_span{op},          'mojo.template';
     is_deeply $tmpl_span{data}, { compiled => 'no' };
+  };
+
+  it 'creates a breadcrumb when rendering template' => sub {
+    $setup->();
+    my $span = Sentry::Tracing::Span->new();
+    $scope->set_span($span);
+
+    my $mt = Mojo::Template->new(name => 'tmpl foo');
+    $mt->render('foo');
+
+    is scalar $scope->breadcrumbs->@*, 1;
+    my %breadcrumb = $scope->breadcrumbs->[-1]->%*;
+    is $breadcrumb{type},     'default';
+    is $breadcrumb{category}, 'mojo.template';
+    is $breadcrumb{message},  'Rendering tmpl foo';
+
+    # Render compiled template
+    $mt->process('foo');
+
+    is scalar $scope->breadcrumbs->@*, 2;
+    %breadcrumb = $scope->breadcrumbs->[-1]->%*;
+    is $breadcrumb{message},  'Rendering cached tmpl foo';
   };
 
   it 'fixes stacktrace by default' => sub {

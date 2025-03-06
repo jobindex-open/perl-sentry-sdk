@@ -4,6 +4,7 @@ use Mojo::Base 'Sentry::Integration::Base', -signatures;
 use Sentry::Util 'around';
 use Try::Tiny;
 
+has breadcrumbs        => 1;
 has tracing            => 1;
 has fix_stacktrace     => 1;
 has template_namespace => 'Mojo::Template::Sandbox';
@@ -28,6 +29,14 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       my $hub         = $get_current_hub->();
       my $parent_span = $self->tracing && $hub->get_current_scope->get_span;
 
+      $hub->add_breadcrumb({
+        type     => 'default',
+        category => 'mojo.template',
+        message  => "Rendering "
+          . ($mojo_template->compiled ? 'cached ' : '')
+          . $mojo_template->name,
+      })
+        if $self->breadcrumbs;
 
       my $span;
       if ($parent_span) {
