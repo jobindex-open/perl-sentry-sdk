@@ -51,7 +51,7 @@ describe 'Sentry::Integration::MojoTemplate' => sub {
     is scalar $span->spans->@*, 1;
     my %tmpl_span = $span->spans->[0]->%*;
     is $tmpl_span{description}, 'tmpl foo';
-    is $tmpl_span{op},          'mojo.template';
+    is $tmpl_span{op},          'template.render';
     is_deeply $tmpl_span{data}, { compiled => 'no' };
   };
 

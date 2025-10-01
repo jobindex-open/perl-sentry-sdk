@@ -21,7 +21,7 @@ describe 'Sentry::Tracing::Span' => sub {
 
     before each => sub {
       $span->start_child({
-        op => 'sql.query', description => 'SELECT * FROM foo' });
+        op => 'db.sql.execute', description => 'SELECT * FROM foo' });
 
       $child_span = $span->spans->[0];
     };
@@ -32,7 +32,7 @@ describe 'Sentry::Tracing::Span' => sub {
     };
 
     it 'sets the op' => sub {
-      is $child_span->op, 'sql.query';
+      is $child_span->op, 'db.sql.execute';
     };
 
     it 'sets the description' => sub {
