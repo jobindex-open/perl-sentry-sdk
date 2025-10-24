@@ -56,6 +56,8 @@ sub with_scope ($self, $cb) {
 
   try {
     $cb->($scope);
+  } catch {
+    die $_;
   } finally {
     $self->pop_scope;
   };
