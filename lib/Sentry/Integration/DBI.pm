@@ -1,8 +1,6 @@
 package Sentry::Integration::DBI;
 use Mojo::Base 'Sentry::Integration::Base', -signatures;
 
-use Mojo::Util qw(dumper monkey_patch);
-
 has breadcrumbs => 1;
 has tracing     => 1;
 
@@ -28,17 +26,23 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       my $hub = $get_current_hub->();
 
       my $span;
+      my %span_data = $self->tracing || $self->breadcrumbs
+        ? _get_query_data(\@args)
+        : ();
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
-          op => 'db.sql.execute', description => $statement, });
+          op          => 'db.sql.execute',
+          description => $statement,
+          data        => { %span_data, _get_db_data($dbh) },
+        });
+      }
+
+      if ($self->breadcrumbs) {
+        _record_breadcrumb($hub, $statement, \%span_data);
       }
 
       my $value = $orig->($dbh, $statement, @args);
-
-      $hub->add_breadcrumb({
-        type => 'query', category => 'do', data => { sql => $statement }, })
-        if $self->breadcrumbs;
 
       if (defined $span && $self->tracing) {
         $span->finish();
@@ -58,23 +62,23 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       my $hub = $get_current_hub->();
 
       my $span;
+      my %span_data = $self->tracing || $self->breadcrumbs
+        ? _get_query_data(\@args)
+        : ();
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
-          op          => 'db.sql.execute',
-          description => $statement,
-          data        => { args => [@args], },
+          op               => 'db.sql.execute',
+          description      => $statement,
+          data             => { %span_data, _get_db_data($sth->{Database}) },
         });
       }
 
-      my $value = $orig->($sth, @args);
+      if ($self->breadcrumbs) {
+        _record_breadcrumb($hub, $statement, \%span_data);
+      }
 
-      $hub->add_breadcrumb({
-        type     => 'query',
-        category => 'execute',
-        data     => { sql => $statement, args => [@args], },
-      })
-        if $self->breadcrumbs;
+      my $value = $orig->($sth, @args);
 
       if (defined $span && $self->tracing) {
         $span->finish();
@@ -83,6 +87,35 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       return $value;
     }
   );
+}
+
+sub _record_breadcrumb($hub, $statement, $span_data) {
+  $hub->add_breadcrumb({
+      type     => 'query',
+      category => 'query',
+      message  => $statement,
+      data     => $span_data,
+    });
+}
+
+sub _get_query_data($args) {
+  my %data;
+
+  if ($args && @$args) {
+    $data{args} = $args;
+  }
+
+  return %data;
+}
+
+sub _get_db_data($dbh) {
+  my %data;
+
+  my $db_name_info_type = 17; # SQL_DBMS_NAME
+  my $db_name = $dbh->get_info($db_name_info_type);
+  $data{'db.system.name'} = lc($db_name) if $db_name;
+
+  return %data;
 }
 
 1;
