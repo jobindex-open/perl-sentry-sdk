@@ -19,6 +19,7 @@ sub around ($package, $method, $cb) {
 }
 
 sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
+  return if !$self->breadcrumbs && !$self->tracing;
 
   around(
     'DBI::db',
@@ -51,8 +52,6 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       return $value;
     }
   );
-
-  return if (!$self->breadcrumbs && !$self->tracing);
 
   around(
     'DBI::st',
