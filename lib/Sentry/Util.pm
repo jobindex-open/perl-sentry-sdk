@@ -8,7 +8,7 @@ use Mojo::Util   qw(dumper monkey_patch);
 use UUID::Tiny ':std';
 use List::Util qw(pairmap);
 
-our @EXPORT_OK = qw(uuid4 truncate merge around restore_original stringify_ref);
+our @EXPORT_OK = qw(uuid4 truncate truncate_deeply merge around restore_original stringify_ref);
 
 sub uuid4 {
   my $uuid = create_uuid_as_string(UUID_V4);
@@ -20,6 +20,17 @@ sub truncate ($string, $max = 0) {
   return $string if (ref($string) || $max == 0);
 
   return length($string) <= $max ? $string : substr($string, 0, $max) . '...';
+}
+
+sub truncate_deeply ($data, $max_string_length = 0) {
+  if (ref $data eq 'HASH') {
+    return { map { $_ => truncate_deeply($data->{$_}, $max_string_length) } keys %$data };
+  } elsif (ref $data eq 'ARRAY') {
+    return [ map { truncate_deeply($_, $max_string_length) } @$data ];
+  } elsif (!ref $data && defined $data) {
+    return &truncate($data, $max_string_length);
+  }
+  return $data;
 }
 
 sub merge ($target, $source, $key) {

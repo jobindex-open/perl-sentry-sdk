@@ -3,7 +3,7 @@ use Mojo::Base -strict, -signatures;
 use Mojo::Util 'dumper';
 use Test::More;
 use Sentry::Util qw(
-  uuid4 truncate merge around
+  uuid4 truncate truncate_deeply merge around
 );
 
 subtest 'uuid4()' => sub {
@@ -12,6 +12,55 @@ subtest 'uuid4()' => sub {
 
 subtest 'truncate()' => sub {
   is(truncate('abcdef', 2), 'ab...');
+};
+
+subtest 'truncate_deeply()' => sub {
+  my $data = {
+    string => 'abcdef',
+    nested => ['short', { string => 'another long string', undef => undef }],
+  };
+
+  is_deeply(
+    truncate_deeply($data, 5),
+    {
+      string => 'abcde...',
+      nested => ['short', { string => 'anoth...', undef => undef }],
+    }
+  );
+
+  is_deeply(
+    truncate_deeply(
+      {
+        exact  => 'abc',
+        longer => 'abcd',
+        empty  => '',
+        zero   => 0,
+        undef  => undef,
+        array  => [],
+        hash   => {},
+      },
+      3
+    ),
+    {
+      exact  => 'abc',
+      longer => 'abc...',
+      empty  => '',
+      zero   => 0,
+      undef  => undef,
+      array  => [],
+      hash   => {},
+    },
+    'handles boundary-length and empty values'
+  );
+
+  is_deeply(
+    truncate_deeply({ nested => ['abcdef', { string => 'uvwxyz' }] }),
+    { nested => ['abcdef', { string => 'uvwxyz' }] },
+    'does not truncate when the default limit is zero'
+  );
+
+  my $scalar_ref = \'abcdef';
+  is(truncate_deeply($scalar_ref, 2), $scalar_ref, 'returns other references unchanged');
 };
 
 subtest 'merge()' => sub {
