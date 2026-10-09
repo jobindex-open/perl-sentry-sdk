@@ -42,7 +42,7 @@ describe 'Sentry::Integration::MojoTemplate' => sub {
 
   it 'creates a span when rendering template' => sub {
     $setup->();
-    my $span = Sentry::Tracing::Span->new();
+    my $span = Sentry::Tracing::Transaction->new(sampled => 1);
     $scope->set_span($span);
 
     my $mt = Mojo::Template->new(name => 'tmpl foo');

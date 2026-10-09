@@ -7,28 +7,28 @@ use Test::More;
 use Test::Spec;
 
 describe 'Sentry::Tracing::Span' => sub {
+  my $transaction;
   my $span;
 
   before each => sub {
+    $transaction = Sentry::Tracing::Transaction->new(name => 'my transaction', sampled => 1);
     $span = Sentry::Tracing::Span->new({
-      transaction =>
-        Sentry::Tracing::Transaction->new(name => 'my transaction'),
+      transaction => $transaction,
     });
+    $transaction->add_span($span);
   };
 
   describe 'start_child()' => sub {
     my $child_span;
 
     before each => sub {
-      $span->start_child({
+      $child_span = $span->start_child({
         op => 'db.sql.execute', description => 'SELECT * FROM foo' });
-
-      $child_span = $span->spans->[0];
     };
 
     it 'adds a child span' => sub {
-      is scalar $span->spans->@*, 1;
-      isa_ok $span->spans->[0], 'Sentry::Tracing::Span';
+      is scalar $transaction->spans->@*, 2;
+      isa_ok $transaction->spans->[1], 'Sentry::Tracing::Span';
     };
 
     it 'sets the op' => sub {

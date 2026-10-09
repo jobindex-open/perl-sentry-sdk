@@ -55,8 +55,7 @@ has parent_span_id => undef;
 # Was this span chosen to be sent as part of the sample?
 has sampled => undef;
 
-has spans       => sub { [] };
-has transaction => undef;
+has transaction => undef, weak => 1;
 has request     => undef;
 
 sub start_child ($self, $span_context = {}) {
@@ -66,11 +65,10 @@ sub start_child ($self, $span_context = {}) {
     sampled         => $self->sampled,
     trace_id        => $self->trace_id,
     start_timestamp => time,
+    transaction     => $self->transaction,
   });
 
-  push $self->spans->@*, $child_span;
-
-  $child_span->transaction($self->transaction);
+  $self->transaction->add_span($child_span) if $self->transaction;
 
   return $child_span;
 }
@@ -124,11 +122,6 @@ sub set_http_status ($self, $status) {
 
 sub finish ($self) {
   $self->timestamp(time);
-}
-
-sub _collect_spans ($self) {
-  my @spans = map { ($_, $_->_collect_spans()->@*) } $self->spans->@*;
-  return \@spans || [];
 }
 
 1;

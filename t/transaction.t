@@ -10,6 +10,7 @@ use lib Mojo::File->new(Cwd::realpath((caller)[1]))->sibling('lib')->to_string;
 use Mock::Sentry::Hub;
 use Mojo::Util 'dumper';
 use Sentry::Tracing::Transaction;
+use Sentry::Tracing::Span;
 use Test::Spec;
 
 describe 'Sentry::Tracing::Transaction' => sub {
@@ -44,6 +45,36 @@ describe 'Sentry::Tracing::Transaction' => sub {
     $tx->set_name('bla');
 
     is $tx->name, 'bla';
+  };
+
+  describe 'add_span()' => sub {
+    it 'adds a span' => sub {
+      $tx->sampled(1);
+      my $span = Sentry::Tracing::Span->new;
+
+      $tx->add_span($span);
+
+      is scalar $tx->spans->@*, 1;
+    };
+
+    it 'does not add a span if not sampled' => sub {
+      $tx->sampled(0);
+      my $span = Sentry::Tracing::Span->new;
+
+      $tx->add_span($span);
+
+      is scalar $tx->spans->@*, 0;
+    };
+
+    it 'does not add more than MAX_SPANS' => sub {
+      $tx->sampled(1);
+      for (1 .. Sentry::Tracing::Transaction->MAX_SPANS + 1) {
+        my $span = Sentry::Tracing::Span->new;
+        $tx->add_span($span);
+      }
+
+      is scalar $tx->spans->@*, Sentry::Tracing::Transaction->MAX_SPANS;
+    };
   };
 };
 

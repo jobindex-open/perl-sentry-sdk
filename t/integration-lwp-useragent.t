@@ -53,14 +53,14 @@ describe 'Sentry::Integration::LwpUserAgent' => sub {
 
   it 'sets the Sentry-Trace request header' => sub {
     my $scope = $hub->get_current_scope;
-    my $span  = Sentry::Tracing::Span->new(tags => { foo => 'bar' });
+    my $span  = Sentry::Tracing::Transaction->new(tags => { foo => 'bar' }, sampled => 1);
     $scope->set_span($span);
 
     $http->get('http://example.com/');
 
     my %headers = $span->spans->[0]->data->{headers}->flatten;
 
-    like $headers{'Sentry-Trace'}, qr{\A [a-z0-9]{32} - [a-z0-9]{16} \z}xms;
+    like $headers{'Sentry-Trace'}, qr{\A [a-z0-9]{32} - [a-z0-9]{16} - 1 \z}xms;
   };
 };
 
