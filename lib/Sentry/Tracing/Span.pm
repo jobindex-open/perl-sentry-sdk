@@ -105,7 +105,7 @@ sub to_trace_parent ($self) {
   my $sampled_string = '';
 
   if (defined $self->sampled) {
-    $sampled_string = $self->sampled ? '-1' : '0';
+    $sampled_string = '-' . ($self->sampled ? '1' : '0');
   }
 
   return $self->trace_id . '-' . $self->span_id . $sampled_string;

@@ -77,7 +77,7 @@ describe 'Sentry::Tracing::Span' => sub {
     it 'not sampled' => sub {
       $span->sampled(0);
 
-      is $span->to_trace_parent, 'traceid-spanid0';
+      is $span->to_trace_parent, 'traceid-spanid-0';
     };
 
     it 'not sampled' => sub {
