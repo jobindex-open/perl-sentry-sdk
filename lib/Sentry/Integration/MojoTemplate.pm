@@ -42,6 +42,7 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
       my $span;
       if ($parent_span) {
         $span = $parent_span->start_child({
+          origin      => 'auto.template.mojo_template',
           op          => 'template.render',
           description => $mojo_template->name,
           data => { compiled => $mojo_template->compiled ? 'yes' : 'no', },

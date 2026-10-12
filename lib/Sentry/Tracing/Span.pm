@@ -50,6 +50,9 @@ has status => undef;
 # Optional. Arbitrary data associated with this Span.
 has data => undef;
 
+# Optional. Trace origin.
+has origin => 'manual';
+
 has parent_span_id => undef;
 
 # Was this span chosen to be sent as part of the sample?
@@ -83,6 +86,7 @@ sub get_trace_context ($self) {
     status         => $self->status,
     tags           => $self->tags,
     trace_id       => $self->trace_id,
+    origin         => $self->origin,
   };
 }
 
@@ -98,6 +102,7 @@ sub TO_JSON ($self) {
     tags            => $self->tags,
     timestamp       => $self->timestamp,
     trace_id        => $self->trace_id,
+    origin          => $self->origin,
   };
 }
 

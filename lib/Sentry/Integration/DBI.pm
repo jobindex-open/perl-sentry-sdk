@@ -33,6 +33,7 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
+          origin      => 'auto.db.dbi.db',
           op          => 'db.sql.execute',
           description => $statement,
           data        => { %span_data, _get_db_data($dbh) },
@@ -67,6 +68,7 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
+          origin           => 'auto.db.dbi.st',
           op               => 'db.sql.execute',
           description      => $statement,
           data             => { %span_data, _get_db_data($sth->{Database}) },

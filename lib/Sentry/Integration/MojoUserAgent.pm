@@ -25,6 +25,7 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
+          origin      => 'auto.http.mojo_useragent',
           op          => 'http.client',
           description => $tx->req->method . ' ' . $tx->req->url->to_string,
           data        =>

@@ -26,6 +26,7 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
 
       if ($self->tracing && (my $parent_span = $hub->get_scope()->get_span)) {
         $span = $parent_span->start_child({
+          origin      => 'auto.http.lwp',
           op          => 'http.client',
           description => $request->method . ' ' . $request->uri,
           data        => {
