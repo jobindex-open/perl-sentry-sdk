@@ -27,7 +27,8 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
     'Mojo::Template',
     process => sub ($orig, $mojo_template, @args) {
       my $hub         = $get_current_hub->();
-      my $parent_span = $self->tracing && $hub->get_current_scope->get_span;
+      my $scope       = $hub->get_current_scope;
+      my $parent_span = $self->tracing && $scope->get_span;
 
       $hub->add_breadcrumb({
         type     => 'default',
@@ -45,10 +46,14 @@ sub setup_once ($self, $add_global_event_processor, $get_current_hub) {
           description => $mojo_template->name,
           data => { compiled => $mojo_template->compiled ? 'yes' : 'no', },
         });
+        $scope->set_span($span);
       }
 
       my $output = $orig->($mojo_template, @args);
-      $span->finish() if $span;
+      if ($span) {
+        $span->finish();
+        $scope->set_span($parent_span);
+      }
       return $output;
     }
   );

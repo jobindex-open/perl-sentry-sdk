@@ -55,6 +55,21 @@ describe 'Sentry::Integration::MojoTemplate' => sub {
     is_deeply $tmpl_span{data}, { compiled => 'no' };
   };
 
+  it 'creates nested spans when rendering a nested template' => sub {
+    $setup->();
+    my $span = Sentry::Tracing::Transaction->new(sampled => 1);
+    $scope->set_span($span);
+
+    my $mt = Mojo::Template->new(name => 'tmpl parent');
+    $mt->render(
+      q{<%= Mojo::Template->new(name => 'tmpl child')->render('child') %>});
+
+    is scalar $span->spans->@*, 2;
+    is $span->spans->[0]->description,   'tmpl parent';
+    is $span->spans->[1]->description,   'tmpl child';
+    is $span->spans->[1]->parent_span_id, $span->spans->[0]->span_id;
+  };
+
   it 'creates a breadcrumb when rendering template' => sub {
     $setup->();
     my $span = Sentry::Tracing::Span->new();
