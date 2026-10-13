@@ -368,6 +368,32 @@ describe 'Mojolicious::Plugin::SentrySDK' => sub {
       is $request->{data}, '[too large]', 'large body replaced with placeholder';
     };
 
+    it 'does not parse JSON bodies exceeding the size limit' => sub {
+      my $parsed = 0;
+      my $orig_json = Mojo::Message->can('json');
+      no warnings 'redefine';
+      local *Mojo::Message::json = sub { $parsed++; $orig_json->(@_) };
+
+      $t->post_ok(
+        '/post-large' => { 'Content-Type' => 'application/json' } =>
+          '[' x 20
+      )->status_is(HTTP_OK);
+
+      is $parsed, 1, 'small JSON body was parsed';
+      $parsed = 0;
+
+      $t->post_ok(
+        '/post-large' => { 'Content-Type' => 'application/json' } =>
+          '[' x 20_000
+      )->status_is(HTTP_OK);
+
+      is $parsed, 0, 'oversized JSON body was not parsed';
+
+      my @lines = split /\n/, $http->requests->[1]{body};
+      my $transaction = decode_json($lines[2]);
+      is $transaction->{request}{data}, '[too large]', 'placeholder used';
+    };
+
     it 'replaces file uploads with placeholder but keeps text fields' => sub {
       # Note: Test::Mojo's multipart form handling
       $t->post_ok(

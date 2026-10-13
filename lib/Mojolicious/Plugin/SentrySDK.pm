@@ -38,16 +38,11 @@ sub _extract_request_data ($req, $max_body_size) {
 
   # Handle JSON content
   if ($content_type =~ m!^application/json!) {
-    my $json = $req->json;
-    if (defined $json) {
-      # If body exceeds limit, replace with placeholder (unless always)
-      return '[too large]' if defined $max_body_size && $body_size > $max_body_size;
+    # Check the size before parsing so oversized bodies are never decoded
+    return '[too large]' if defined $max_body_size && $body_size > $max_body_size;
 
-      # Otherwise return structured data as-is
-      return $json;
-    }
     # If JSON parsing failed, don't send raw body
-    return undef;
+    return $req->json;
   }
 
   # Handle form data (application/x-www-form-urlencoded or multipart/form-data)
