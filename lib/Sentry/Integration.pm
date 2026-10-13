@@ -19,6 +19,8 @@ sub _global_integrations {
   );
 }
 
+my %installed_integrations;
+
 sub setup ($package, $custom_integrations = [], $with_defaults = 1) {
   my @all_integrations;
   if ($with_defaults) {
@@ -27,9 +29,13 @@ sub setup ($package, $custom_integrations = [], $with_defaults = 1) {
   }
   push @all_integrations, $custom_integrations->@*;
   foreach my $integration (grep { !$_->initialized } @all_integrations) {
-    $integration->setup_once(
-      Sentry::Hub::Scope->can('add_global_event_processor'),
-      Sentry::Hub->can('get_current_hub'));
+    my $class = ref $integration;
+    unless ($installed_integrations{$class}) {
+      $integration->setup_once(
+        Sentry::Hub::Scope->can('add_global_event_processor'),
+        Sentry::Hub->can('get_current_hub'));
+      $installed_integrations{$class} = 1;
+    }
 
     $integration->initialized(1);
   }
