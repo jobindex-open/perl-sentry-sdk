@@ -1,4 +1,3 @@
-requires 'Clone';
 requires 'HTTP::Status';
 requires 'List::Util',  '1.44';
 requires 'Mojolicious', '>= 8';

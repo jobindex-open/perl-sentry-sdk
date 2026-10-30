@@ -1,7 +1,6 @@
 package Sentry::Hub::Scope;
 use Mojo::Base -base, -signatures;
 
-use Clone qw();
 use Mojo::Util 'dumper';
 use Sentry::Severity;
 use Sentry::Tracing::Span;
@@ -165,7 +164,16 @@ sub apply_to_event ($self, $event, $hint = undef) {
 }
 
 sub clone ($self) {
-  Clone::clone($self);
+  # Copy scope containers, but keep their contents and active span shared.
+  return ref($self)->new({
+    $self->%*,
+    breadcrumbs            => [$self->breadcrumbs->@*],
+    contexts               => { $self->contexts->%* },
+    error_event_processors => [$self->error_event_processors->@*],
+    event_processors       => [$self->event_processors->@*],
+    extra                  => { $self->extra->%* },
+    tags                   => { $self->tags->%* },
+  });
 }
 
 sub update ($self, $fields) {

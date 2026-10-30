@@ -51,7 +51,6 @@
       },
       "runtime" : {
          "requires" : {
-            "Clone" : "0",
             "HTTP::Status" : "0",
             "List::Util" : "1.44",
             "Mojolicious" : "8",
