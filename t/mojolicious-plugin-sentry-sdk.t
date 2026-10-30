@@ -41,6 +41,8 @@ use Test::Spec;
     my $route = $self->routes->get('/dies')->to(controller => 'foo');
     $route->get('')->to(action => 'dies');
     $route->get('/nested/:foo')->to(action => 'dies');
+    my $bridge = $self->routes->under('/bridge/:result')->to('foo#bridge');
+    $bridge->post('')->to('foo#post_json');
   }
 
   package MyApp::Controller::Foo;
@@ -72,6 +74,18 @@ use Test::Spec;
 
   sub post_large ($self) {
     $self->render(json => { received => 'ok' });
+  }
+
+  sub bridge ($self) {
+    $self->session(bridge => 'visited');
+    $self->stash(bridge => 'visited');
+    Sentry::SDK->add_breadcrumb({ category => 'bridge', message => 'visited' });
+    die 'bridge boom' if $self->stash('result') eq 'fail';
+    if ($self->stash('result') eq 'stop') {
+      $self->render(text => 'stopped', status => HTTP::Status::HTTP_FORBIDDEN());
+      return undef;
+    }
+    return 1;
   }
 
   sub dies { die 'boom' }
@@ -139,6 +153,78 @@ describe 'Mojolicious::Plugin::SentrySDK' => sub {
 
     is $event{transaction} => '/dies/nested/:foo';
 
+  };
+
+  it 'captures request context when a bridge throws an exception' => sub {
+    $t->post_ok(
+      '/bridge/fail?source=test' =>
+        { Cookie => 'test=value', 'X-Test' => 'bridge' } =>
+        json => { key => 'value' }
+    )->status_is(HTTP_INTERNAL_SERVER_ERROR);
+
+    is $http->requests->@*, 2;
+    my $event = $http->requests->[0]{body};
+    ok exists $event->{exception};
+    is $event->{logger}, 'mojo';
+    is $event->{transaction}, '/bridge/:result';
+    is $event->{request}{method}, 'POST';
+    like $event->{request}{url}, qr!/bridge/fail\?source=test$!;
+    is_deeply $event->{request}{query_string}, { source => 'test' };
+    is_deeply $event->{request}{cookies}, { test => 'value' };
+    is $event->{request}{headers}{'X-Test'}, 'bridge';
+    is_deeply $event->{request}{data}, { key => 'value' };
+    is $event->{extra}{session}{bridge}, 'visited';
+    is $event->{extra}{stash}{bridge}, 'visited';
+    is $event->{modules}{Mojolicious}, $Mojolicious::VERSION;
+    is $event->{breadcrumbs}[-1]{category}, 'bridge';
+    is $event->{contexts}{trace}{op}, 'http.server';
+
+    my @lines = split /\n/, $http->requests->[1]{body};
+    my $transaction = decode_json($lines[2]);
+    is $transaction->{transaction}, '/bridge/:result';
+    is $transaction->{contexts}{trace}{status}, 'internal_error';
+    is_deeply $transaction->{request}, $event->{request};
+    ok !defined Sentry::Hub->get_current_scope->get_span;
+  };
+
+  it 'uses one transaction for a bridge and its endpoint' => sub {
+    $t->post_ok('/bridge/pass' => json => { key => 'value' })
+      ->status_is(HTTP_OK)->json_is('/received/key', 'value');
+
+    is $http->requests->@*, 1;
+    my @lines = split /\n/, $http->requests->[0]{body};
+    my $transaction = decode_json($lines[2]);
+    is $transaction->{transaction}, '/bridge/:result';
+    ok scalar grep { $_->{category} eq 'bridge' } $transaction->{breadcrumbs}->@*;
+    is $transaction->{contexts}{trace}{status}, 'ok';
+  };
+
+  it 'finishes the transaction when a bridge stops dispatch' => sub {
+    $t->post_ok('/bridge/stop' => json => { key => 'value' })
+      ->status_is(HTTP_FORBIDDEN)->content_is('stopped');
+
+    is $http->requests->@*, 1;
+    my @lines = split /\n/, $http->requests->[0]{body};
+    my $transaction = decode_json($lines[2]);
+    is $transaction->{transaction}, '/bridge/:result';
+    is $transaction->{contexts}{trace}{status}, 'permission_denied';
+  };
+
+  it 'captures request context before routing' => sub {
+    $t->app->hook(before_dispatch => sub { die 'dispatch boom' });
+    $t->get_ok('/before-dispatch')->status_is(HTTP_INTERNAL_SERVER_ERROR);
+
+    is $http->requests->@*, 2;
+    my $event = $http->requests->[0]{body};
+    ok exists $event->{exception};
+    is $event->{transaction}, 'dispatch';
+    is $event->{request}{method}, 'GET';
+    like $event->{request}{url}, qr!/before-dispatch$!;
+
+    my @lines = split /\n/, $http->requests->[1]{body};
+    my $transaction = decode_json($lines[2]);
+    is $transaction->{transaction}, 'dispatch';
+    is $transaction->{contexts}{trace}{status}, 'internal_error';
   };
 
   describe 'max_request_body_size configuration' => sub {

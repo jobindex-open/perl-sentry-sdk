@@ -90,22 +90,19 @@ sub register ($self, $app, $conf) {
   );
 
   $app->hook(
-    around_action => sub ($next, $c, $action, $last) {
-      return $next->() unless $last;
-
+    around_dispatch => sub ($next, $c) {
       my $req = $c->req;
 
       Sentry::Hub->get_current_hub()->with_scope(sub ($scope) {
         my %cookies = map { ($_->name, $_->value) } ($req->cookies // [])->@*;
-        my $transaction_name = $c->match->endpoint->to_string || '/';
-        $scope->set_transaction_name($transaction_name);
+        $scope->set_transaction_name('dispatch');
 
         # Extract and truncate request data
         my $request_data = _extract_request_data($req, $max_body_size);
 
         my $transaction = Sentry::SDK->start_transaction(
           {
-            name    => $transaction_name,
+            name    => 'dispatch',
             op      => 'http.server',
             request => {
               url          => $req->url->to_abs->to_string,
@@ -144,6 +141,17 @@ sub register ($self, $app, $conf) {
           $transaction->finish();
         };
       });
+    }
+  );
+
+  $app->hook(
+    around_action => sub ($next, $c, $action, $last) {
+      my $transaction_name = $c->match->endpoint->to_string || '/';
+      my $scope = Sentry::Hub->get_current_scope;
+      $scope->set_transaction_name($transaction_name);
+      $scope->get_span->transaction->set_name($transaction_name);
+
+      return $next->();
     }
   );
 
