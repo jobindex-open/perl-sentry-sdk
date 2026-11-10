@@ -125,6 +125,28 @@ describe 'Mojolicious::Plugin::SentrySDK' => sub {
     is $http->requests->[0]{body}{level}, Sentry::Severity->Error;
   };
 
+  it 'retains transaction names after a nested dispatch scope is popped' =>
+    sub {
+      $t->app->hook(
+        around_dispatch => sub ($next, $c) {
+          Sentry::Hub->get_current_hub->with_scope(sub ($scope) {
+            $next->();
+          });
+        }
+      );
+
+      for my $path ('/', '/dies/nested/1') {
+        $http->requests->@* = ();
+        $t->get_ok($path)
+          ->status_is($path eq '/' ? HTTP_OK : HTTP_INTERNAL_SERVER_ERROR);
+
+        my $expected    = $path eq '/' ? '/' : '/dies/nested/:foo';
+        my @lines       = split /\n/, $http->requests->[-1]{body};
+        my $transaction = decode_json($lines[2]);
+        is $transaction->{transaction}, $expected;
+      }
+    };
+
   it 'registers breadcrumbs' => sub {
     # Sentry-Requests are ignored in the MojoUserAgent integration
     my %do_not_track = ('x-sentry-auth' => 1);

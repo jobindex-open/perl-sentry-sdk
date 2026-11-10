@@ -69,6 +69,7 @@ sub set_level ($self, $level) {
   $self->level($level);
 }
 
+# Names non-transaction events only; tracing transactions have their own name.
 sub set_transaction_name ($self, $name) {
   $self->transaction_name($name);
   return $self;
@@ -135,9 +136,11 @@ sub apply_to_event ($self, $event, $hint = undef) {
   merge($event, $self, 'user')     if $self->user;
   merge($event, $self, 'contexts') if $self->contexts;
 
-  $event->{logger}      = $self->logger           if $self->logger;
-  $event->{level}       = $self->level            if $self->level;
-  $event->{transaction} = $self->transaction_name if $self->transaction_name;
+  $event->{logger} = $self->logger if $self->logger;
+  $event->{level}  = $self->level  if $self->level;
+  if ($self->transaction_name && ($event->{type} // '') ne 'transaction') {
+    $event->{transaction} = $self->transaction_name;
+  }
 
   if ($self->span) {
     $event->{request} = $self->span->request;

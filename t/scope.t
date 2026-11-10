@@ -203,6 +203,34 @@ describe 'Sentry::Hub::Scope' => sub {
 
   describe 'apply_to_event()' => sub {
 
+    describe 'transaction name' => sub {
+      before each => sub {
+        $scope->set_transaction_name('scope name');
+      };
+
+      it 'overrides the name on error and message events' => sub {
+        for my $event (
+          { exception => { values => [] }, transaction => 'event name' },
+          { message   => 'hello',          transaction => 'event name' },
+        ) {
+          is $scope->apply_to_event($event)->{transaction}, 'scope name';
+        }
+      };
+
+      it 'preserves the name on transaction events' => sub {
+        my $event = $scope->apply_to_event(
+          { type => 'transaction', transaction => 'transaction name' });
+
+        is $event->{transaction}, 'transaction name';
+      };
+
+      it 'does not supply a name for transaction events' => sub {
+        my $event = $scope->apply_to_event({ type => 'transaction' });
+
+        ok !exists $event->{transaction};
+      };
+    };
+
     it 'sets the request payload', sub {
       my $event = $scope->apply_to_event({});
 
